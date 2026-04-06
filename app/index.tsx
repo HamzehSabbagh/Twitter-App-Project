@@ -324,10 +324,23 @@ export default function HomeScreen() {
                     elevation: 8,
                   }}
                 >
-                  <Link href="/settings" asChild>
+                  <Link href="/notifications" asChild>
                     <Pressable
                       onPress={() => setAccountMenuOpen(false)}
                       className="flex-row items-center rounded-xl px-3 py-3"
+                      style={{ backgroundColor: colors.surface }}
+                    >
+                      <Ionicons name="notifications-outline" size={18} color={colors.text} />
+                      <Text className="ml-3 text-sm font-medium" style={{ color: colors.text }}>
+                        {t("notifications", "Notifications")}
+                      </Text>
+                    </Pressable>
+                  </Link>
+
+                  <Link href="/settings" asChild>
+                    <Pressable
+                      onPress={() => setAccountMenuOpen(false)}
+                      className="mt-1 flex-row items-center rounded-xl px-3 py-3"
                       style={{ backgroundColor: colors.surface }}
                     >
                       <Ionicons name="settings-outline" size={18} color={colors.text} />
