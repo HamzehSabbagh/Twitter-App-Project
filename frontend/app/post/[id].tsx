@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL, parseJsonResponse } from "@/lib/api";
+import { sharePost } from "@/lib/post-sharing";
 import { MentionInput } from "@/components/mention-input";
 import { PostMediaPreview } from "@/components/post-media-preview";
 import { RichContentText } from "@/components/rich-content-text";
@@ -171,6 +172,38 @@ export default function PostDetailScreen() {
     }
   }
 
+  async function openShareSheet() {
+    if (!post) {
+      return;
+    }
+
+    try {
+      await sharePost(
+        {
+          id: post.id,
+          type: "post",
+          content: post.content,
+          authorName: displayName(post.user),
+          username: post.user.username ?? null,
+        },
+        {
+          appName: t("app_name", "HearUs"),
+          shareTitle: t("share_post", "Share post"),
+          checkOutPost: t("check_out_this_post", "Check out this post on HearUs."),
+          mediaOnlyPost: t("media_only_post", "Media-only post"),
+          sharedPostWithoutComment: t("shared_post_without_comment", "Shared a post"),
+          openInApp: t("open_in_hearus", "Open in HearUs"),
+        }
+      );
+    } catch (shareError) {
+      setError(
+        shareError instanceof Error
+          ? shareError.message
+          : t("share_failed", "Could not share this post.")
+      );
+    }
+  }
+
   async function toggleCommentLike(commentItem: CommentItem) {
     if (!token) {
       const message = t("sign_in_required", "You need to log in first.");
@@ -320,6 +353,16 @@ export default function PostDetailScreen() {
                       />
                       <Text className="text-sm font-semibold" style={{ color: colors.text }}>
                         {post.reposts_count ?? 0}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={openShareSheet}
+                      className="flex-row items-center gap-2 rounded-full px-3 py-2"
+                      style={{ backgroundColor: colors.surface }}
+                    >
+                      <Ionicons name="share-social-outline" size={18} color={colors.textMuted} />
+                      <Text className="text-sm font-semibold" style={{ color: colors.text }}>
+                        {t("share", "Share")}
                       </Text>
                     </Pressable>
                     <Text className="text-sm" style={{ color: colors.textMuted }}>{post.comments_count} {t("comments", "comments")}</Text>

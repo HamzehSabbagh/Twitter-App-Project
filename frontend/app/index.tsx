@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL, parseJsonResponse } from "@/lib/api";
+import { sharePost } from "@/lib/post-sharing";
 import { CommentPreviewList } from "@/components/comment-preview-list";
 import { PostMediaPreview } from "@/components/post-media-preview";
 import { RichContentText } from "@/components/rich-content-text";
@@ -110,7 +111,7 @@ function getUserDisplayName(user?: {
   return user?.username ?? "Unknown user";
 }
 
-function formatUnreadCount(unreadCount: number) {
+  function formatUnreadCount(unreadCount: number) {
   return unreadCount > 99 ? "99+" : unreadCount.toString();
 }
 
@@ -288,6 +289,36 @@ export default function HomeScreen() {
     }
   }
 
+  async function openShareSheet(post: Post) {
+    try {
+      await sharePost(
+        {
+          id: post.id,
+          type: post.is_repost ? "repost" : "post",
+          title: post.title,
+          content: post.content ?? post.original_post?.content ?? null,
+          authorName: getDisplayName(post),
+          username: post.user?.username ?? null,
+        },
+        {
+          appName: t("app_name", "HearUs"),
+          shareTitle: t("share_post", "Share post"),
+          checkOutPost: t("check_out_this_post", "Check out this post on HearUs."),
+          checkOutRepost: t("check_out_this_repost", "Check out this repost on HearUs."),
+          mediaOnlyPost: t("media_only_post", "Media-only post"),
+          sharedPostWithoutComment: t("shared_post_without_comment", "Shared a post"),
+          openInApp: t("open_in_hearus", "Open in HearUs"),
+        }
+      );
+    } catch (shareError) {
+      setError(
+        shareError instanceof Error
+          ? shareError.message
+          : t("share_failed", "Could not share this post.")
+      );
+    }
+  }
+
   function openRepostComposer(post: Post) {
     if (!user) {
       setError(t("sign_in_required", "You need to log in first."));
@@ -351,7 +382,7 @@ export default function HomeScreen() {
 
                 <View className="mt-8 flex-row flex-wrap gap-3">
                   <Pressable
-                    onPress={() => router.push("/register")}
+                    onPress={() => router.push("/signup")}
                     className="rounded-xl px-5 py-3"
                     style={{ backgroundColor: colors.primary }}
                   >
@@ -586,7 +617,7 @@ export default function HomeScreen() {
                     ) : (
                       <>
                         <Pressable
-                          onPress={() => router.push("/register")}
+                          onPress={() => router.push("/signup")}
                           className="rounded-2xl px-4 py-3"
                           style={{ backgroundColor: colors.primary }}
                         >
@@ -710,7 +741,23 @@ export default function HomeScreen() {
                     style={{ marginTop: 12, color: colors.textSecondary, fontSize: 15, lineHeight: 24 }}
                   />
 
-                  <PostMediaPreview media={item.media ?? []} />
+                  <PostMediaPreview
+                    media={item.media ?? []}
+                    interactive={false}
+                    onOpenPost={() =>
+                      router.push(
+                        item.is_repost
+                          ? {
+                              pathname: "/repost-show/[id]",
+                              params: { id: item.id.toString() },
+                            }
+                          : {
+                              pathname: "/post/[id]",
+                              params: { id: item.id.toString() },
+                            }
+                      )
+                    }
+                  />
 
                   {item.is_repost && item.original_post ? (
                     <View
@@ -737,7 +784,16 @@ export default function HomeScreen() {
                             fallback={t("media_only_post", "Media-only post")}
                             style={{ marginTop: 12, color: colors.textSecondary, fontSize: 14, lineHeight: 22 }}
                           />
-                          <PostMediaPreview media={item.original_post.media ?? []} />
+                          <PostMediaPreview
+                            media={item.original_post.media ?? []}
+                            interactive={false}
+                            onOpenPost={() =>
+                              router.push({
+                                pathname: "/repost-show/[id]",
+                                params: { id: item.id.toString() },
+                              })
+                            }
+                          />
                         </View>
                       </View>
                     </View>
@@ -794,7 +850,15 @@ export default function HomeScreen() {
                         {item.likes_count ?? 0}
                       </Text>
                     </Pressable>
-                    <Ionicons name="share-social-outline" size={18} color={colors.textMuted} />
+                    <Pressable
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        void openShareSheet(item);
+                      }}
+                      className="rounded-full px-2 py-1"
+                    >
+                      <Ionicons name="share-social-outline" size={18} color={colors.textMuted} />
+                    </Pressable>
                   </View>
                 </View>
               </View>

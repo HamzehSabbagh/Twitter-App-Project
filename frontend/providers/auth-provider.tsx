@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
-import { API_BASE_URL, parseJsonResponse } from "@/lib/api";
+import { apiFetch, API_BASE_URL, parseJsonResponse } from "@/lib/api";
 import { unregisterStoredPushToken } from "@/lib/push-notifications";
 
 type AuthUser = {
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signIn(payload: LoginPayload) {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    const response = await apiFetch(`${API_BASE_URL}/login`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -120,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(payload: RegisterPayload) {
-    const response = await fetch(`${API_BASE_URL}/register`, {
+    const response = await apiFetch(`${API_BASE_URL}/register`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -133,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function resendVerification(email: string) {
-    const response = await fetch(`${API_BASE_URL}/email/verification-notification`, {
+    const response = await apiFetch(`${API_BASE_URL}/email/verification-notification`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -149,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       try {
         await unregisterStoredPushToken(token);
-        await fetch(`${API_BASE_URL}/logout`, {
+        await apiFetch(`${API_BASE_URL}/logout`, {
           method: "POST",
           headers: {
             Accept: "application/json",
@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
-    return fetch(input, {
+    return apiFetch(input, {
       ...init,
       headers,
     });

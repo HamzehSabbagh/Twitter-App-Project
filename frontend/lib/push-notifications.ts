@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { API_BASE_URL } from "@/lib/api";
+import { apiFetch, API_BASE_URL } from "@/lib/api";
 
 export const PUSH_TOKEN_KEY = "expo_push_token";
 
@@ -11,6 +11,25 @@ export function getPushProjectId() {
     process.env.EXPO_PUBLIC_EAS_PROJECT_ID ||
     Constants.easConfig?.projectId ||
     Constants.expoConfig?.extra?.eas?.projectId
+  );
+}
+
+export function isTemporaryExpoPushTokenError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  if (error.name === "ExpoPushTokenTemporaryError") {
+    return true;
+  }
+
+  const message = error.message.toLowerCase();
+
+  return (
+    message.includes("received: 503") ||
+    message.includes("connection timeout") ||
+    message.includes("upstream connect error") ||
+    message.includes("disconnect/reset before headers")
   );
 }
 
@@ -54,8 +73,19 @@ export async function registerForPushNotificationsAsync() {
     return null;
   }
 
-  const token = await Notifications.getExpoPushTokenAsync({ projectId });
-  return token.data;
+  try {
+    const token = await Notifications.getExpoPushTokenAsync({ projectId });
+    return token.data;
+  } catch (error) {
+    if (isTemporaryExpoPushTokenError(error)) {
+      console.info("Expo push token service is temporarily unavailable. The app will retry later.");
+      const retryableError = new Error("Expo push token service is temporarily unavailable.");
+      retryableError.name = "ExpoPushTokenTemporaryError";
+      throw retryableError;
+    }
+
+    throw error;
+  }
 }
 
 export async function unregisterStoredPushToken(authToken?: string | null) {
@@ -66,7 +96,7 @@ export async function unregisterStoredPushToken(authToken?: string | null) {
   }
 
   try {
-    await fetch(`${API_BASE_URL}/push-tokens`, {
+    await apiFetch(`${API_BASE_URL}/push-tokens`, {
       method: "DELETE",
       headers: {
         Accept: "application/json",

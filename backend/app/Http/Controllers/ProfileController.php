@@ -8,6 +8,7 @@ use App\Support\UserBlocks;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -15,6 +16,11 @@ use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
+    private function mediaUrl($media): string
+    {
+        return $this->absoluteUrl(route('post.media', ['media' => $media->id], false));
+    }
+
     private function absoluteUrl(string $path): string
     {
         if (Str::startsWith($path, ['http://', 'https://'])) {
@@ -42,7 +48,7 @@ class ProfileController extends Controller
 
     public function show(Request $request, User $user): JsonResponse
     {
-        $viewer = $request->user();
+        $viewer = $this->resolveViewer($request);
         $isAdmin = strtolower((string) $viewer?->role?->name) === 'admin';
         $isOwner = $viewer?->id === $user->id;
         $blockedByViewer = UserBlocks::blockedByViewer($viewer, $user);
@@ -189,6 +195,8 @@ class ProfileController extends Controller
 
         return response()->json([
             'message' => 'Follow removed.',
+            'is_following' => false,
+            'follow_request_sent' => false,
         ]);
     }
 
@@ -335,7 +343,6 @@ class ProfileController extends Controller
     {
         $isAdmin = strtolower((string) $viewer?->role?->name) === 'admin';
         $isOwner = $viewer?->id === $user->id;
-        $publicDisk = Storage::disk('public');
         $blockedByViewer = UserBlocks::blockedByViewer($viewer, $user);
         $blocksViewer = UserBlocks::blocksViewer($viewer, $user);
 
@@ -374,7 +381,7 @@ class ProfileController extends Controller
                 'id' => $media->id,
                 'type' => $media->type,
                 'path' => $media->path,
-                'url' => $this->absoluteUrl($publicDisk->url($media->path)),
+                'url' => $this->mediaUrl($media),
                 'mime_type' => $media->mime_type,
             ])->values(),
         ])->concat(
@@ -406,7 +413,7 @@ class ProfileController extends Controller
                             'id' => $media->id,
                             'type' => $media->type,
                             'path' => $media->path,
-                            'url' => $this->absoluteUrl($publicDisk->url($media->path)),
+                            'url' => $this->mediaUrl($media),
                             'mime_type' => $media->mime_type,
                         ])->values(),
                     ],
@@ -471,6 +478,19 @@ class ProfileController extends Controller
                     });
             })
             ->exists();
+    }
+
+    private function resolveViewer(Request $request): ?User
+    {
+        $viewer = $request->user();
+
+        if ($viewer instanceof User) {
+            return $viewer;
+        }
+
+        $guardViewer = Auth::guard('sanctum')->user();
+
+        return $guardViewer instanceof User ? $guardViewer : null;
     }
 
     private function transformBlockedProfile(User $user, ?User $viewer, bool $blockedByViewer, bool $blocksViewer): array

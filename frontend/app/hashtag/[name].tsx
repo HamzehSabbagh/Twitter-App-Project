@@ -220,7 +220,16 @@ export default function HashtagScreen() {
                 style={{ marginTop: 12, color: colors.textSecondary, fontSize: 15, lineHeight: 24 }}
               />
 
-              <PostMediaPreview media={item.media ?? []} />
+              <PostMediaPreview
+                media={item.media ?? []}
+                interactive={false}
+                onOpenPost={() =>
+                  router.push({
+                    pathname: "/post/[id]",
+                    params: { id: item.id.toString() },
+                  })
+                }
+              />
 
               {!!item.hashtags?.length ? (
                 <View className="mt-3 flex-row flex-wrap gap-2">

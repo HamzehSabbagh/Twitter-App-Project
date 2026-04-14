@@ -86,6 +86,24 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         </View>
+
+        <View className="mt-5 rounded-[28px] border p-5" style={{ borderColor: colors.borderSoft, backgroundColor: colors.surface }}>
+          <Text className="text-lg font-semibold" style={{ color: colors.text }}>
+            {t("api_connection", "API connection")}
+          </Text>
+          <Text className="mt-2 text-sm" style={{ color: colors.textSecondary }}>
+            {t("api_connection_description", "Run a quick health check to see which backend URL the app can reach right now.")}
+          </Text>
+          <Pressable
+            onPress={() => router.push("/api-health")}
+            className="mt-4 self-start rounded-2xl px-4 py-3"
+            style={{ backgroundColor: colors.primary }}
+          >
+            <Text className="font-semibold" style={{ color: colors.primaryText }}>
+              {t("open_api_health", "Open API health")}
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

@@ -22,6 +22,11 @@ use Illuminate\Validation\ValidationException;
 
 class PostController extends Controller
 {
+    private function mediaUrl(PostMedia $media): string
+    {
+        return $this->absoluteUrl(route('post.media', ['media' => $media->id], false));
+    }
+
     private function absoluteUrl(string $path): string
     {
         if (Str::startsWith($path, ['http://', 'https://'])) {
@@ -657,7 +662,6 @@ class PostController extends Controller
 
     private function transformRepost(Repost $repost): array
     {
-        $publicDisk = Storage::disk('public');
         $post = $repost->post;
 
         return [
@@ -698,7 +702,7 @@ class PostController extends Controller
                     'id' => $media->id,
                     'type' => $media->type,
                     'path' => $media->path,
-                    'url' => $this->absoluteUrl($publicDisk->url($media->path)),
+                    'url' => $this->mediaUrl($media),
                     'mime_type' => $media->mime_type,
                 ])->values(),
             ] : null,
@@ -737,7 +741,6 @@ class PostController extends Controller
 
     private function transformPost(Post $post, bool $withComments = false): array
     {
-        $publicDisk = Storage::disk('public');
         $viewer = request()->user();
         $userId = $viewer?->id;
         $isAdmin = strtolower((string) $viewer?->role?->name) === 'admin';
@@ -771,7 +774,7 @@ class PostController extends Controller
                 'id' => $media->id,
                 'type' => $media->type,
                 'path' => $media->path,
-                'url' => $this->absoluteUrl($publicDisk->url($media->path)),
+                'url' => $this->mediaUrl($media),
                 'mime_type' => $media->mime_type,
             ])->values(),
             'comments_preview' => $post->comments->take(2)->map(

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\PostMedia;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
@@ -9,6 +10,17 @@ use Illuminate\Support\Facades\Storage;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/media/{media}', function (PostMedia $media) {
+    $disk = Storage::disk('public');
+
+    abort_unless($media->path && $disk->exists($media->path), 404);
+
+    return response()->file($disk->path($media->path), [
+        'Content-Type' => $media->mime_type ?? 'application/octet-stream',
+        'Cache-Control' => 'public, max-age=31536000',
+    ]);
+})->name('post.media');
 
 Route::get('/profile/{user:username}/image', function (Request $request, User $user) {
     $type = $request->query('type', 'picture');

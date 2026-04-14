@@ -270,14 +270,6 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
-      {accountMenuOpen ? (
-        <Pressable
-          onPress={() => setAccountMenuOpen(false)}
-          className="absolute inset-0"
-          style={{ zIndex: 10 }}
-        />
-      ) : null}
-
       <FlatList
         data={filteredPosts}
         keyExtractor={(item) => item.id.toString()}
@@ -313,40 +305,42 @@ export default function ExploreScreen() {
                         elevation: 8,
                       }}
                     >
-                      <Link href="/notifications" asChild>
-                        <Pressable
-                          onPress={() => setAccountMenuOpen(false)}
-                          className="flex-row items-center justify-between rounded-xl px-3 py-3"
-                          style={{ backgroundColor: colors.surface }}
-                        >
-                          <View className="flex-row items-center">
-                            <Ionicons name="notifications-outline" size={18} color={colors.text} />
-                            <Text className="ml-3 text-sm font-medium" style={{ color: colors.text }}>
-                              {t("notifications", "Notifications")}
+                      <Pressable
+                        onPress={() => {
+                          setAccountMenuOpen(false);
+                          router.push("/notifications");
+                        }}
+                        className="flex-row items-center justify-between rounded-xl px-3 py-3"
+                        style={{ backgroundColor: colors.surface }}
+                      >
+                        <View className="flex-row items-center">
+                          <Ionicons name="notifications-outline" size={18} color={colors.text} />
+                          <Text className="ml-3 text-sm font-medium" style={{ color: colors.text }}>
+                            {t("notifications", "Notifications")}
+                          </Text>
+                        </View>
+                        {unreadCount > 0 ? (
+                          <View className="rounded-full px-2 py-1" style={{ backgroundColor: colors.primary }}>
+                            <Text className="text-[10px] font-bold" style={{ color: colors.primaryText }}>
+                              {formatUnreadCount(unreadCount)}
                             </Text>
                           </View>
-                          {unreadCount > 0 ? (
-                            <View className="rounded-full px-2 py-1" style={{ backgroundColor: colors.primary }}>
-                              <Text className="text-[10px] font-bold" style={{ color: colors.primaryText }}>
-                                {formatUnreadCount(unreadCount)}
-                              </Text>
-                            </View>
-                          ) : null}
-                        </Pressable>
-                      </Link>
+                        ) : null}
+                      </Pressable>
 
-                      <Link href="/settings" asChild>
-                        <Pressable
-                          onPress={() => setAccountMenuOpen(false)}
-                          className="mt-1 flex-row items-center rounded-xl px-3 py-3"
-                          style={{ backgroundColor: colors.surface }}
-                        >
-                          <Ionicons name="settings-outline" size={18} color={colors.text} />
-                          <Text className="ml-3 text-sm font-medium" style={{ color: colors.text }}>
-                            {t("settings", "Settings")}
-                          </Text>
-                        </Pressable>
-                      </Link>
+                      <Pressable
+                        onPress={() => {
+                          setAccountMenuOpen(false);
+                          router.push("/settings");
+                        }}
+                        className="mt-1 flex-row items-center rounded-xl px-3 py-3"
+                        style={{ backgroundColor: colors.surface }}
+                      >
+                        <Ionicons name="settings-outline" size={18} color={colors.text} />
+                        <Text className="ml-3 text-sm font-medium" style={{ color: colors.text }}>
+                          {t("settings", "Settings")}
+                        </Text>
+                      </Pressable>
 
                       <Pressable
                         onPress={async () => {
@@ -570,7 +564,16 @@ export default function ExploreScreen() {
               style={{ marginTop: 12, color: colors.textSecondary, fontSize: 15, lineHeight: 24 }}
             />
 
-            <PostMediaPreview media={item.media ?? []} />
+            <PostMediaPreview
+              media={item.media ?? []}
+              interactive={false}
+              onOpenPost={() =>
+                router.push({
+                  pathname: "/post/[id]",
+                  params: { id: item.id.toString() },
+                })
+              }
+            />
             <CommentPreviewList
               comments={item.comments_preview ?? []}
               authFetch={authFetch}

@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, Image, Pressable, Text, View } from "react-native";
@@ -29,17 +30,27 @@ type ConversationsResponse = {
   conversations: ConversationListItem[];
 };
 
+type NotificationsResponse = {
+  notifications: {
+    id: string;
+    read_at?: string | null;
+  }[];
+  unread_count: number;
+};
+
 function getDisplayName(participant?: ConversationListItem["participant"]) {
   const fullName = [participant?.first_name, participant?.last_name].filter(Boolean).join(" ").trim();
   return fullName || participant?.username || "Unknown user";
 }
 
 export default function MessagesScreen() {
-  const { authFetch, token } = useAuth();
+  const { authFetch, token, signOut, user } = useAuth();
   const { t, colors } = useAppSettings();
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const loadConversations = useCallback(async () => {
     if (!token) {
@@ -71,31 +82,173 @@ export default function MessagesScreen() {
     }, [loadConversations])
   );
 
+  const loadUnreadCount = useCallback(async () => {
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+
+    try {
+      const response = await authFetch(`${API_BASE_URL}/notifications`);
+      const data = await parseJsonResponse<NotificationsResponse>(response);
+      setUnreadCount(data.unread_count);
+    } catch {
+      setUnreadCount(0);
+    }
+  }, [authFetch, user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadUnreadCount();
+    }, [loadUnreadCount])
+  );
+
+  function formatUnreadCount(count: number) {
+    return count > 99 ? "99+" : count.toString();
+  }
+
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
+      {accountMenuOpen ? (
+        <Pressable
+          onPress={() => setAccountMenuOpen(false)}
+          className="absolute inset-0"
+          style={{ zIndex: 10 }}
+        />
+      ) : null}
+
+      <View
+        className="border-b px-4 pb-3 pt-2"
+        style={{ borderColor: colors.border, backgroundColor: colors.surface, zIndex: 20 }}
+      >
+        <View className="flex-row items-center justify-between">
+          {user ? (
+            <Link
+              href={{
+                pathname: "/profile/[username]",
+                params: { username: user.username },
+              }}
+              asChild
+            >
+              <Pressable className="overflow-hidden rounded-full border" style={{ borderColor: colors.borderSoft, backgroundColor: colors.surfaceAlt }}>
+                <Image
+                  source={getProfileImageSource(user.picture_url)}
+                  className="h-10 w-10"
+                  resizeMode="cover"
+                />
+              </Pressable>
+            </Link>
+          ) : (
+            <View className="overflow-hidden rounded-full border" style={{ borderColor: colors.borderSoft, backgroundColor: colors.surfaceAlt }}>
+              <Image source={getProfileImageSource()} className="h-10 w-10" resizeMode="cover" />
+            </View>
+          )}
+          <Text className="text-2xl font-black" style={{ color: colors.text }}>{t("app_name", "HearUs")}</Text>
+          {user ? (
+            <View style={{ position: "relative" }}>
+              <Pressable
+                onPress={() => setAccountMenuOpen((current) => !current)}
+                className="rounded-full border p-2"
+                style={{ borderColor: colors.borderSoft, backgroundColor: colors.surfaceAlt }}
+              >
+                <Ionicons
+                  name={accountMenuOpen ? "close-outline" : "ellipsis-horizontal"}
+                  size={22}
+                  color={colors.accentText}
+                />
+              </Pressable>
+
+              {accountMenuOpen ? (
+                <View
+                  className="absolute right-0 top-14 w-44 rounded-2xl border p-2"
+                  style={{
+                    borderColor: colors.borderSoft,
+                    backgroundColor: colors.surface,
+                    zIndex: 30,
+                    elevation: 8,
+                  }}
+                >
+                  <Link href="/notifications" asChild>
+                    <Pressable
+                      onPress={() => setAccountMenuOpen(false)}
+                      className="flex-row items-center justify-between rounded-xl px-3 py-3"
+                      style={{ backgroundColor: colors.surface }}
+                    >
+                      <View className="flex-row items-center">
+                        <Ionicons name="notifications-outline" size={18} color={colors.text} />
+                        <Text className="ml-3 text-sm font-medium" style={{ color: colors.text }}>
+                          {t("notifications", "Notifications")}
+                        </Text>
+                      </View>
+                      {unreadCount > 0 ? (
+                        <View className="rounded-full px-2 py-1" style={{ backgroundColor: colors.primary }}>
+                          <Text className="text-[10px] font-bold" style={{ color: colors.primaryText }}>
+                            {formatUnreadCount(unreadCount)}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  </Link>
+
+                  <Link href="/settings" asChild>
+                    <Pressable
+                      onPress={() => setAccountMenuOpen(false)}
+                      className="mt-1 flex-row items-center rounded-xl px-3 py-3"
+                      style={{ backgroundColor: colors.surface }}
+                    >
+                      <Ionicons name="settings-outline" size={18} color={colors.text} />
+                      <Text className="ml-3 text-sm font-medium" style={{ color: colors.text }}>
+                        {t("settings", "Settings")}
+                      </Text>
+                    </Pressable>
+                  </Link>
+
+                  <Pressable
+                    onPress={async () => {
+                      setAccountMenuOpen(false);
+                      await signOut();
+                      router.replace("/login");
+                    }}
+                    className="mt-1 flex-row items-center rounded-xl px-3 py-3"
+                    style={{ backgroundColor: colors.dangerBg }}
+                  >
+                    <Ionicons name="log-out-outline" size={18} color={colors.dangerText} />
+                    <Text className="ml-3 text-sm font-medium" style={{ color: colors.dangerText }}>
+                      {t("logout", "Log out")}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          ) : (
+            <Ionicons name="sparkles-outline" size={22} color={colors.accentText} />
+          )}
+        </View>
+
+        <View className="mt-5 flex-row rounded-2xl border p-1" style={{ borderColor: colors.borderSoft, backgroundColor: colors.surfaceAlt }}>
+          <Link href="/" asChild>
+            <Pressable className="flex-1 items-center justify-center rounded-xl py-3">
+              <Text className="text-base" style={{ color: colors.textMuted }}>{t("timeline", "Timeline")}</Text>
+            </Pressable>
+          </Link>
+          <Link href="/explore" asChild>
+            <Pressable className="flex-1 items-center justify-center rounded-xl py-3">
+              <Text className="text-base" style={{ color: colors.textMuted }}>{t("discover", "Discover")}</Text>
+            </Pressable>
+          </Link>
+          <View className="flex-1 items-center rounded-xl py-3" style={{ backgroundColor: colors.primary }}>
+            <Text className="text-base font-semibold" style={{ color: colors.primaryText }}>{t("messages", "Messages")}</Text>
+          </View>
+        </View>
+      </View>
+
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={{ paddingBottom: 40 }}
         ListHeaderComponent={
           <View className="px-4 pb-4 pt-2">
-            <View className="mt-4 flex-row rounded-2xl border p-1" style={{ borderColor: colors.borderSoft, backgroundColor: colors.surfaceAlt }}>
-              <Link href="/" asChild>
-                <Pressable className="flex-1 items-center justify-center rounded-xl py-3">
-                  <Text className="text-base" style={{ color: colors.textMuted }}>{t("timeline", "Timeline")}</Text>
-                </Pressable>
-              </Link>
-              <Link href="/explore" asChild>
-                <Pressable className="flex-1 items-center justify-center rounded-xl py-3">
-                  <Text className="text-base" style={{ color: colors.textMuted }}>{t("discover", "Discover")}</Text>
-                </Pressable>
-              </Link>
-              <View className="flex-1 items-center rounded-xl py-3" style={{ backgroundColor: colors.primary }}>
-                <Text className="text-base font-semibold" style={{ color: colors.primaryText }}>{t("messages", "Messages")}</Text>
-              </View>
-            </View>
-
-            <View className="mt-4 rounded-[28px] border p-5" style={{ borderColor: colors.borderSoft, backgroundColor: colors.surface }}>
+            <View className="rounded-[28px] border p-5" style={{ borderColor: colors.borderSoft, backgroundColor: colors.surface }}>
               <Text className="text-xs font-semibold uppercase tracking-[3px]" style={{ color: colors.accentText }}>
                 {t("messages", "Messages")}
               </Text>

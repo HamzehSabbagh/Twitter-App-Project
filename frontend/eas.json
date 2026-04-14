@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://remembered-injuries-sensor-graduate.trycloudflare.com/api"
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.4:8000/api"
       }
     },
     "production": {

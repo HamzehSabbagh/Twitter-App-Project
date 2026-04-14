@@ -4,7 +4,11 @@ import { useRouter } from "expo-router";
 import { ReactNode, useEffect } from "react";
 import { Platform } from "react-native";
 import { API_BASE_URL, parseJsonResponse } from "@/lib/api";
-import { PUSH_TOKEN_KEY, registerForPushNotificationsAsync } from "@/lib/push-notifications";
+import {
+  isTemporaryExpoPushTokenError,
+  PUSH_TOKEN_KEY,
+  registerForPushNotificationsAsync,
+} from "@/lib/push-notifications";
 import { useAuth } from "@/providers/auth-provider";
 
 Notifications.setNotificationHandler({
@@ -54,6 +58,7 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
     }
 
     let cancelled = false;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
 
     async function syncPushToken() {
       try {
@@ -81,14 +86,30 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
           await AsyncStorage.setItem(PUSH_TOKEN_KEY, expoPushToken);
         }
       } catch (error) {
+        if (isTemporaryExpoPushTokenError(error)) {
+          console.info("Push registration will retry because Expo's token service is temporarily unavailable.");
+
+          if (!cancelled) {
+            retryTimeout = setTimeout(() => {
+              void syncPushToken();
+            }, 30000);
+          }
+
+          return;
+        }
+
         console.warn("Could not register push notifications", error);
       }
     }
 
-    syncPushToken();
+    void syncPushToken();
 
     return () => {
       cancelled = true;
+
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
     };
   }, [authFetch, token, user]);
 

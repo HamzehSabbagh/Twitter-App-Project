@@ -1,7 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
-import { Alert } from "react-native";
-import { ActivityIndicator, FlatList, Image, Pressable, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL, parseJsonResponse } from "@/lib/api";
 import { PostMediaPreview } from "@/components/post-media-preview";
@@ -74,6 +73,12 @@ type Profile = {
   posts?: ProfilePost[];
 };
 
+type FollowResponse = {
+  message: string;
+  is_following?: boolean;
+  follow_request_sent?: boolean;
+};
+
 export default function ProfileScreen() {
   const { username } = useLocalSearchParams<{ username: string }>();
   const router = useRouter();
@@ -82,13 +87,17 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [followLoading, setFollowLoading] = useState(false);
 
-  const loadProfile = useCallback(async () => {
+  const loadProfile = useCallback(async (options?: { silent?: boolean }) => {
     if (!username) {
       return;
     }
 
-    setLoading(true);
+    if (!options?.silent) {
+      setLoading(true);
+    }
+
     setError("");
 
     try {
@@ -98,7 +107,9 @@ export default function ProfileScreen() {
     } catch (profileError) {
       setError(profileError instanceof Error ? profileError.message : t("could_not_load_profile", "Could not load profile."));
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
     }
   }, [authFetch, t, username]);
 
@@ -107,6 +118,20 @@ export default function ProfileScreen() {
       loadProfile();
     }, [loadProfile])
   );
+
+  useEffect(() => {
+    if (!profile?.follow_request_sent) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      void loadProfile({ silent: true });
+    }, 5000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [loadProfile, profile?.follow_request_sent]);
 
   async function toggleFollow() {
     const isOwnProfile = !!(profile && user?.username === profile.username);
@@ -120,15 +145,47 @@ export default function ProfileScreen() {
       return;
     }
 
+    if (followLoading) {
+      return;
+    }
+
+    setFollowLoading(true);
+
     try {
+      const isSendingFollowRequest = !profile.is_following && !profile.follow_request_sent;
       const response = await authFetch(`${API_BASE_URL}/profile/${profile.username}/follow`, {
-        method: profile.is_following ? "DELETE" : "POST",
+        method: isSendingFollowRequest ? "POST" : "DELETE",
       });
 
-      await parseJsonResponse(response);
-      await loadProfile();
+      const data = await parseJsonResponse<FollowResponse>(response);
+
+      setProfile((currentProfile) =>
+        currentProfile
+          ? {
+              ...currentProfile,
+              is_following:
+                typeof data.is_following === "boolean"
+                  ? data.is_following
+                  : profile.is_following
+                    ? false
+                    : currentProfile.is_following,
+              follow_request_sent:
+                typeof data.follow_request_sent === "boolean"
+                  ? data.follow_request_sent
+                  : false,
+              can_message:
+                isSendingFollowRequest
+                  ? false
+                  : false,
+            }
+          : currentProfile
+      );
+      setError("");
+      await loadProfile({ silent: true });
     } catch (followError) {
       setError(followError instanceof Error ? followError.message : t("could_not_update_follow", "Could not update follow."));
+    } finally {
+      setFollowLoading(false);
     }
   }
 
@@ -345,11 +402,13 @@ export default function ProfileScreen() {
                           <>
                             <Pressable
                               onPress={toggleFollow}
+                              disabled={followLoading}
                               className="rounded-full border px-5 py-3"
                               style={{
                                 borderColor: profile.is_following || profile.follow_request_sent ? colors.borderSoft : colors.primary,
                                 backgroundColor:
                                   profile.is_following || profile.follow_request_sent ? colors.surfaceAlt : colors.primary,
+                                opacity: followLoading ? 0.7 : 1,
                               }}
                             >
                               <Text
@@ -359,10 +418,12 @@ export default function ProfileScreen() {
                                     profile.is_following || profile.follow_request_sent ? colors.text : colors.primaryText,
                                 }}
                               >
-                                {profile.is_following
+                                {followLoading
+                                  ? t("loading", "Loading...")
+                                  : profile.is_following
                                   ? t("unfollow", "Unfollow")
                                   : profile.follow_request_sent
-                                    ? t("requested", "Requested")
+                                    ? t("cancel_request", "Cancel request")
                                     : t("follow", "Follow")}
                               </Text>
                             </Pressable>
@@ -464,7 +525,23 @@ export default function ProfileScreen() {
                   }
                   style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 24 }}
                 />
-                <PostMediaPreview media={item.media ?? []} />
+                <PostMediaPreview
+                  media={item.media ?? []}
+                  interactive={false}
+                  onOpenPost={() =>
+                    router.push(
+                      item.is_repost
+                        ? {
+                            pathname: "/repost-show/[id]",
+                            params: { id: item.id.toString() },
+                          }
+                        : {
+                            pathname: "/post/[id]",
+                            params: { id: item.id.toString() },
+                          }
+                    )
+                  }
+                />
 
                 {item.is_repost && item.original_post ? (
                   <View
@@ -495,7 +572,16 @@ export default function ProfileScreen() {
                           fallback={t("media_only_post", "Media-only post")}
                           style={{ marginTop: 12, color: colors.textSecondary, fontSize: 14, lineHeight: 22 }}
                         />
-                        <PostMediaPreview media={item.original_post.media ?? []} />
+                        <PostMediaPreview
+                          media={item.original_post.media ?? []}
+                          interactive={false}
+                          onOpenPost={() =>
+                            router.push({
+                              pathname: "/repost-show/[id]",
+                              params: { id: item.id.toString() },
+                            })
+                          }
+                        />
                       </View>
                     </View>
                   </View>
