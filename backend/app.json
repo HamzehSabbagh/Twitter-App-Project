@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "a0de8380-bd5a-42cc-bb74-2e6fdfc3303a"
+      }
+    },
+    "android": {
+      "package": "com.fatalis2005.twitterapi"
+    }
+  }
+}
